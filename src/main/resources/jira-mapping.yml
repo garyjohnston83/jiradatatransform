@@ -1,0 +1,24 @@
+jiraFieldMappings:
+  "Issue Key":
+    issueAttributeName: "key"
+    dataType: "String[IssueKey]"
+
+  "Summary":
+    issueAttributeName: "fields.summary"
+    dataType: "String"
+
+  "Due Date":
+    issueAttributeName: "fields.duedate"
+    dataType: "DateAsString[yyyy-mm-dd]"
+
+  "Parent Link":
+    issueAttributeName: "fields.parent.key"
+    dataType: "String[IssueKey]"
+    isParentLink: true
+
+  "Dependant Issues":
+    issueLink:
+      isInward: true
+      linkTypes:
+        - "is dependent on"
+        - "is blocked by"

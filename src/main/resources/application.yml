@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+jira:
+  base-url:
+  email:
+  authtoken:
+  mapping-config: "classpath:jira-mapping.yml"
+
+logging:
+  level:
+    root: INFO
