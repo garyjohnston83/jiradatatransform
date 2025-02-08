@@ -11,6 +11,10 @@ jiraFieldMappings:
     issueAttributeName: "fields.duedate"
     dataType: "DateAsString[yyyy-mm-dd]"
 
+  "Labels":
+    issueAttributeName: "fields.labels"
+    dataType: "String[]"
+
   "Parent Link":
     issueAttributeName: "fields.parent.key"
     dataType: "String[IssueKey]"

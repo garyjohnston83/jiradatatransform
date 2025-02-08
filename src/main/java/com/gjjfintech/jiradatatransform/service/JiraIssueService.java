@@ -28,7 +28,7 @@ public class JiraIssueService {
     }
 
     public String getMyProfileDisplayName() {
-        // 1. Fetch initial issues using the provided JQL.
+        // 1. Fetch my profile using the Jira API.
         JsonNode myProfile = jiraApiClient.getMyProfile();
         JsonNode displayNameNode = myProfile.get("displayName");
         return displayNameNode.asText();
@@ -114,8 +114,14 @@ public class JiraIssueService {
                 String jsonPointer = convertToJsonPointer(mapping.getIssueAttributeName());
                 JsonNode valueNode = issue.at(jsonPointer);
                 if (!valueNode.isMissingNode() && !valueNode.isNull()) {
-                    String processedValue = processValue(valueNode, mapping.getDataType());
-                    flat.put(flatKey, processedValue);
+                    // Check if the field should be processed as a String array.
+                    if (mapping.getDataType() != null && mapping.getDataType().startsWith("String[]")) {
+                        List<String> processedValues = processStringArrayValue(valueNode);
+                        flat.put(flatKey, processedValues);
+                    } else {
+                        String processedValue = processValue(valueNode, mapping.getDataType());
+                        flat.put(flatKey, processedValue);
+                    }
                 }
             }
         }
@@ -128,7 +134,7 @@ public class JiraIssueService {
      * - For "DateAsString[pattern]", verify/format the date.
      */
     private String processValue(JsonNode valueNode, String dataType) {
-        if (dataType == null || dataType.startsWith("String")) {
+        if (dataType == null || (dataType.startsWith("String") && !dataType.startsWith("String["))) {
             return valueNode.asText();
         } else if (dataType.startsWith("DateAsString")) {
             // Expected format: DateAsString[yyyy-mm-dd] (or similar)
@@ -179,6 +185,24 @@ public class JiraIssueService {
             }
         }
         return linkedIssueKeys;
+    }
+
+    /**
+     * Processes a JsonNode expected to represent an array of strings.
+     * If the node is an array, each element is converted to a String; otherwise,
+     * the node is converted to a single-value list.
+     */
+    private List<String> processStringArrayValue(JsonNode valueNode) {
+        List<String> result = new ArrayList<>();
+        if (valueNode.isArray()) {
+            for (JsonNode element : valueNode) {
+                result.add(element.asText());
+            }
+        } else {
+            // If not an array, return a list with a single element.
+            result.add(valueNode.asText());
+        }
+        return result;
     }
 
     /**
