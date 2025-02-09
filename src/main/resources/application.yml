@@ -2,10 +2,19 @@ server:
   port: 8080
 
 jira:
-  base-url:
-  email:
-  authtoken:
-  mapping-config: "classpath:jira-mapping.yml"
+  source:
+    base-url: ""
+    email: ""
+    authToken: ""
+    bearerToken: ""
+    mapping-config: "classpath:jira-mappings-source.yml"
+
+  destination:
+    base-url: ""
+    email: ""
+    authToken: ""
+    bearerToken: ""
+    mapping-config: "classpath:jira-mappings-destination.yml"
 
 logging:
   level:

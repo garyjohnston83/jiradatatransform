@@ -1,21 +1,15 @@
 package com.gjjfintech.jiradatatransform.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.PropertySource;
-
 import java.util.List;
 import java.util.Map;
 
-@Configuration
-@ConfigurationProperties
-@PropertySource(factory = YamlPropertySourceFactory.class, value = "classpath:jira-mapping.yml")
+/**
+ * A plain POJO representing the Jira mapping configuration.
+ * This class is used to bind the contents of a YAML file (source or destination)
+ * into an instance of this type via our binder utility (JiraMappingPropertiesBinder).
+ */
 public class JiraMappingProperties {
 
-    /**
-     * This map holds the field mappings keyed by the human-readable field name.
-     * For example, "Issue Key", "Summary", etc.
-     */
     private Map<String, FieldMapping> jiraFieldMappings;
 
     public Map<String, FieldMapping> getJiraFieldMappings() {
@@ -28,12 +22,13 @@ public class JiraMappingProperties {
 
     /**
      * Represents the configuration for a single field mapping.
-     * Depending on the field, some properties may be null.
      */
     public static class FieldMapping {
         private String issueAttributeName;
         private String dataType;
         private Boolean isParentLink;
+        // NEW: Flag indicating that this field is used for linking between instances.
+        private Boolean isLinkingId;
         private IssueLinkMapping issueLink;
 
         public String getIssueAttributeName() {
@@ -60,6 +55,14 @@ public class JiraMappingProperties {
             this.isParentLink = isParentLink;
         }
 
+        public Boolean getIsLinkingId() {
+            return isLinkingId;
+        }
+
+        public void setIsLinkingId(Boolean isLinkingId) {
+            this.isLinkingId = isLinkingId;
+        }
+
         public IssueLinkMapping getIssueLink() {
             return issueLink;
         }
@@ -70,8 +73,7 @@ public class JiraMappingProperties {
     }
 
     /**
-     * Represents the special configuration for issue link processing.
-     * This is used when a field represents a Jira issue link (e.g., Dependant Issues).
+     * Represents the special configuration for processing issue links.
      */
     public static class IssueLinkMapping {
         private boolean isInward;
