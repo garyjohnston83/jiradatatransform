@@ -3,18 +3,18 @@ server:
 
 jira:
   source:
-    base-url: ""
-    email: ""
-    authToken: ""
-    bearerToken: ""
-    mapping-config: "classpath:jira-mappings-source.yml"
+    base-url: ${env.JIRA_SOURCE_BASE_URL:}
+    email: ${env.JIRA_SOURCE_EMAIL:}
+    authToken: ${env.JIRA_SOURCE_AUTHTOKEN:}
+    bearerToken: ${env.JIRA_SOURCE_BEARERTOKEN:}
+    mapping-config: "classpath:jira-mapping-source.yml"
 
   destination:
-    base-url: ""
-    email: ""
-    authToken: ""
-    bearerToken: ""
-    mapping-config: "classpath:jira-mappings-destination.yml"
+    base-url: ${env.JIRA_DESTINATION_BASE_URL:}
+    email: ${env.JIRA_DESTINATION_EMAIL:}
+    authToken: ${env.JIRA_DESTINATION_AUTHTOKEN:}
+    bearerToken: ${env.JIRA_DESTINATION_BEARERTOKEN:}
+    mapping-config: "classpath:jira-mapping-destination.yml"
 
 logging:
   level:

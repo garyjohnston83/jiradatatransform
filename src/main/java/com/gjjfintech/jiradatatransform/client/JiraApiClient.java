@@ -16,16 +16,9 @@ public class JiraApiClient {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${jira.base-url}")
     private String baseUrl;
-
-    @Value("${jira.email}")
     private String email;
-
-    @Value("${jira.authToken}")
     private String authToken;
-
-    @Value("${jira.bearerToken}")
     private String bearerToken;
 
     public JiraApiClient() {

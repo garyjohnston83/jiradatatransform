@@ -27,10 +27,10 @@ public class JiraIssueController {
      * - If source=false, issues are retrieved from the destination Jira instance.
      */
     @GetMapping
-    public Collection<Map<String, Object>> getIssues(@RequestParam("jql") String jql,
-                                                     @RequestParam("source") Boolean isSource) {
-        // Assuming your service now has an overloaded method that accepts a Boolean flag:
-        return jiraIssueService.getIssuesByJql(jql, isSource);
+    public Collection<Map<String, Object>> getIssues(@RequestParam(name="jql", required=true) String jql,
+                                                     @RequestParam(name="source", required=false) Boolean isSource) {
+        boolean useSourceJiraInstance = isSource != null && isSource;
+        return jiraIssueService.getIssuesByJql(jql, useSourceJiraInstance);
     }
 
     /**
@@ -39,8 +39,32 @@ public class JiraIssueController {
      * Retrieves the profile display name from the chosen Jira instance.
      */
     @GetMapping("/test")
-    public String testDisplayName(@RequestParam("source") Boolean isSource) {
-        // Assuming your service now has an overloaded method that accepts a Boolean flag:
-        return jiraIssueService.getMyProfileDisplayName(isSource);
+    public String testDisplayName(@RequestParam(name="source", required=false) Boolean isSource) {
+        boolean useSourceJiraInstance = isSource != null && isSource;
+        return jiraIssueService.getMyProfileDisplayName(useSourceJiraInstance);
+    }
+
+    /**
+     * POST /issue?source=true|false
+     *
+     * This endpoint updates or creates a single Jira issue in the chosen instance.
+     * - If the JSON payload includes a non-empty "issueKey", an update is performed.
+     * - Otherwise, a new issue is created (and the payload must include a "projectKey").
+     *
+     * Sample usage with Postman:
+     *   POST http://localhost:8080/issue?source=false
+     *   Content-Type: application/json
+     *   { ... }
+     *
+     * @param isSource  boolean flag indicating which instance to operate on.
+     * @param issueData flattened map of key fields.
+     * @return A ResponseEntity indicating success.
+     */
+    @PostMapping
+    public ResponseEntity<String> updateOrCreateIssue(@RequestBody Map<String, Object> issueData,
+                                                      @RequestParam(name="source", required=false) Boolean isSource) {
+        boolean useSourceJiraInstance = isSource != null && isSource;
+        jiraIssueService.updateOrCreateIssue(useSourceJiraInstance, issueData);
+        return ResponseEntity.ok("Issue update/create operation completed successfully.");
     }
 }

@@ -1,9 +1,11 @@
 package com.gjjfintech.jiradatatransform.service;
 
-import com.gjjfintech.jiradatatransform.client.JiraApiClient;
-import com.gjjfintech.jiradatatransform.config.JiraMappingProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gjjfintech.jiradatatransform.client.JiraApiClient;
+import com.gjjfintech.jiradatatransform.config.JiraMappingProperties;
+import com.gjjfintech.jiradatatransform.util.JsonNodeUtils;
+import com.gjjfintech.jiradatatransform.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -39,7 +41,7 @@ public class JiraIssueService {
         this.objectMapper = objectMapper;
     }
 
-    public String getMyProfileDisplayName(Boolean isSource) {
+    public String getMyProfileDisplayName(boolean isSource) {
         // Choose the appropriate Jira API client based on the flag.
         JiraApiClient client = isSource ? sourceJiraApiClient : destinationJiraApiClient;
         // Fetch the profile and return the display name.
@@ -52,12 +54,12 @@ public class JiraIssueService {
      * Searches for issues using the provided JQL in the chosen Jira instance and returns
      * a collection of flattened issues.
      */
-    public Collection<Map<String, Object>> getIssuesByJql(String jql, Boolean isSource) {
+    public Collection<Map<String, Object>> getIssuesByJql(String jql, boolean useSource) {
         Map<String, Map<String, Object>> allIssues = new HashMap<>();
 
         // Choose the appropriate Jira API client and mapping properties based on the flag.
-        JiraApiClient client = isSource ? sourceJiraApiClient : destinationJiraApiClient;
-        JiraMappingProperties mappingProps = isSource ? sourceMappingProperties : destinationMappingProperties;
+        JiraApiClient client = useSource ? sourceJiraApiClient : destinationJiraApiClient;
+        JiraMappingProperties mappingProps = useSource ? sourceMappingProperties : destinationMappingProperties;
 
         // 1. Fetch initial issues using the provided JQL.
         JsonNode searchResult = client.searchIssues(jql);
@@ -71,7 +73,6 @@ public class JiraIssueService {
         }
 
         // 2. Process each flattened issue for Parent Link and Dependant Issues.
-        //    If any linked issue is not already in our collection, fetch it.
         Set<String> keysToProcess = new HashSet<>(allIssues.keySet());
         for (String key : keysToProcess) {
             Map<String, Object> flatIssue = allIssues.get(key);
@@ -105,37 +106,26 @@ public class JiraIssueService {
                 }
             }
         }
-
         return allIssues.values();
     }
 
-
     /**
      * Synchronizes a collection of source issues to the destination Jira instance.
-     * For each source issue:
-     *  - For epics, if the source issue contains an External Linking ID (flagged in the mapping),
-     *    then that value is used as the destination issue key.
-     *  - For non-epics, matching is based on the Summary field.
-     *  - Only non-special fields are included in the creation/update payload.
      */
     public void synchronizeIssuesToDestination(Collection<Map<String, Object>> sourceIssues) {
         for (Map<String, Object> sourceIssue : sourceIssues) {
-            // Determine if this is an epic by checking for the External Linking ID field.
-            String linkingIdKey = toCamelCase("External Linking ID"); // e.g., "externalLinkingId"
+            String linkingIdKey = StringUtils.toCamelCase("External Linking ID"); // e.g., "externalLinkingId"
             boolean isEpic = sourceIssue.containsKey(linkingIdKey) &&
                     sourceIssue.get(linkingIdKey) != null &&
                     !((String) sourceIssue.get(linkingIdKey)).trim().isEmpty();
 
             String destinationIssueKey = null;
             if (isEpic) {
-                // For epics, use the external linking id as the destination issue key.
                 destinationIssueKey = (String) sourceIssue.get(linkingIdKey);
             } else {
-                // For non-epics, match based on Summary.
-                String summaryKey = toCamelCase("Summary"); // e.g., "summary"
+                String summaryKey = StringUtils.toCamelCase("Summary"); // e.g., "summary"
                 String summary = (String) sourceIssue.get(summaryKey);
                 if (summary != null && !summary.isEmpty()) {
-                    // Use a simple JQL search for destination issues with the same summary.
                     String jql = "summary ~ \"" + summary + "\"";
                     JsonNode searchResult = destinationJiraApiClient.searchIssues(jql);
                     JsonNode issuesArray = searchResult.get("issues");
@@ -145,71 +135,145 @@ public class JiraIssueService {
                 }
             }
 
-            // Build the payload for creation or update.
-            // Use the destination mapping to know which fields to include.
             Map<String, Object> fieldsPayload = new HashMap<>();
             for (Map.Entry<String, JiraMappingProperties.FieldMapping> entry : destinationMappingProperties.getJiraFieldMappings().entrySet()) {
                 String displayName = entry.getKey();
                 JiraMappingProperties.FieldMapping mapping = entry.getValue();
 
-                // Skip special fields (linking IDs, parent links, or issue links)
                 if ((mapping.getIsLinkingId() != null && mapping.getIsLinkingId()) ||
                         (mapping.getIsParentLink() != null && mapping.getIsParentLink()) ||
                         mapping.getIssueLink() != null) {
                     continue;
                 }
-
-                // Use the human-readable field name (converted to camelCase) as the key in the flattened source issue.
-                String flatKey = toCamelCase(displayName);
+                String flatKey = StringUtils.toCamelCase(displayName);
                 if (sourceIssue.containsKey(flatKey)) {
                     Object value = sourceIssue.get(flatKey);
-                    // Place the value in the payload using the destination's attribute name.
                     fieldsPayload.put(mapping.getIssueAttributeName(), value);
                 }
             }
-            // Construct the final payload in the form: { "fields": { ... } }
             Map<String, Object> payload = new HashMap<>();
             payload.put("fields", fieldsPayload);
-
-            // Convert the payload to a JsonNode.
             JsonNode payloadNode = objectMapper.valueToTree(payload);
 
-            // Call the appropriate destination Jira API method.
             if (destinationIssueKey != null && !destinationIssueKey.isEmpty()) {
-                // Update the existing destination issue.
                 destinationJiraApiClient.updateIssue(destinationIssueKey, payloadNode);
             } else {
-                // Create a new issue in the destination instance.
+                String projectKey = (String) sourceIssue.get(StringUtils.toCamelCase("Project Key"));
+                if (projectKey == null || projectKey.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Project key is required for creating a new issue.");
+                }
+                Map<String, Object> projectField = new HashMap<>();
+                projectField.put("key", projectKey);
+                fieldsPayload.put("project", projectField);
+                payload.put("fields", fieldsPayload);
+                payloadNode = objectMapper.valueToTree(payload);
                 destinationJiraApiClient.createIssue(payloadNode);
             }
         }
     }
 
     /**
+     * Updates or creates a single Jira issue in the chosen instance.
+     *
+     * The provided map (issueData) should be a flattened representation of the key fields.
+     * - If the map contains a non-empty "issueKey" field, it will be treated as an update.
+     * - Otherwise, it will be treated as a creation, requiring a "projectKey" field.
+     *
+     * When creating an issue, this method adds the "issuetype" field.
+     * If no "issueType" is provided in the input, it defaults to "Epic".
+     *
+     * @param isSource if true, operate on the source instance; otherwise, operate on the destination instance.
+     * @param issueData a flattened map of the key fields.
+     */
+    public void updateOrCreateIssue(boolean isSource, Map<String, Object> issueData) {
+        // Choose the appropriate Jira API client and mapping configuration.
+        JiraApiClient client = isSource ? sourceJiraApiClient : destinationJiraApiClient;
+        JiraMappingProperties mappingProps = isSource ? sourceMappingProperties : destinationMappingProperties;
+
+        // Build the payload using the mapping configuration.
+        Map<String, Object> fieldsPayload = new HashMap<>();
+        for (Map.Entry<String, JiraMappingProperties.FieldMapping> entry : mappingProps.getJiraFieldMappings().entrySet()) {
+            String displayName = entry.getKey();
+            JiraMappingProperties.FieldMapping mapping = entry.getValue();
+            // Skip special fields: linking IDs, parent links, or issue links.
+            if ((mapping.getIsLinkingId() != null && mapping.getIsLinkingId()) ||
+                    (mapping.getIsParentLink() != null && mapping.getIsParentLink()) ||
+                    mapping.getIssueLink() != null) {
+                continue;
+            }
+            // Use the human‑readable field name converted to camelCase as the key.
+            String flatKey = StringUtils.toCamelCase(displayName);
+            if (issueData.containsKey(flatKey)) {
+                Object value = issueData.get(flatKey);
+                // Remove a "fields." prefix if present, so that we only send, for example, "summary" rather than "fields.summary".
+                String attrName = mapping.getIssueAttributeName();
+                if (attrName.startsWith("fields.")) {
+                    attrName = attrName.substring("fields.".length());
+                }
+                fieldsPayload.put(attrName, value);
+            }
+        }
+
+        // Construct the final payload in the form: { "fields": { ... } }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("fields", fieldsPayload);
+        JsonNode payloadNode = objectMapper.valueToTree(payload);
+
+        // Check if an "issueKey" is provided in the flattened data.
+        String issueKey = (String) issueData.get("issueKey");
+        if (issueKey != null && !issueKey.trim().isEmpty()) {
+            // Update scenario.
+            // Remove the "key" field from the payload (if present) so that we don't send it in the "fields" object.
+            fieldsPayload.remove("key");
+            payload.put("fields", fieldsPayload);
+            payloadNode = objectMapper.valueToTree(payload);
+            client.updateIssue(issueKey, payloadNode);
+        } else {
+            // Creation scenario: require a "projectKey" in the flattened data.
+            String projectKey = (String) issueData.get("projectKey");
+            if (projectKey == null || projectKey.trim().isEmpty()) {
+                throw new IllegalArgumentException("Project key is required for creating a new issue.");
+            }
+            // For Jira create payloads, the project field is typically an object: { "project": { "key": "XXX" } }.
+            Map<String, Object> projectField = new HashMap<>();
+            projectField.put("key", projectKey);
+            fieldsPayload.put("project", projectField);
+
+            // Add issuetype logic: if an "issueType" is provided, use it; otherwise, default to "Epic".
+            String issueType = (String) issueData.get("issueType");
+            if (issueType == null || issueType.trim().isEmpty()) {
+                issueType = "Epic";
+            }
+            // Jira expects the issue type as an object with a "name" property.
+            Map<String, Object> issueTypeField = new HashMap<>();
+            issueTypeField.put("name", issueType);
+            fieldsPayload.put("issuetype", issueTypeField);
+
+            payload.put("fields", fieldsPayload);
+            payloadNode = objectMapper.valueToTree(payload);
+            client.createIssue(payloadNode);
+        }
+    }
+
+
+    /**
      * Flattens a single Jira issue using the provided mapping configuration.
      */
     private Map<String, Object> flattenIssue(JsonNode issue, JiraMappingProperties mappingProps) {
         Map<String, Object> flat = new HashMap<>();
-
-        // Process each field mapping defined in the configuration.
         for (Map.Entry<String, JiraMappingProperties.FieldMapping> entry : mappingProps.getJiraFieldMappings().entrySet()) {
-            String displayName = entry.getKey();  // e.g., "Issue Key", "Summary", etc.
+            String displayName = entry.getKey();
             JiraMappingProperties.FieldMapping mapping = entry.getValue();
-            String flatKey = toCamelCase(displayName);
-
-            // If the mapping defines an issueLink block (for Dependant Issues)
+            String flatKey = StringUtils.toCamelCase(displayName);
             if (mapping.getIssueLink() != null) {
                 List<String> linkedIssues = processIssueLinks(issue, mapping.getIssueLink());
                 flat.put(flatKey, linkedIssues);
-            }
-            // Otherwise, if an attribute name is provided, process it normally.
-            else if (mapping.getIssueAttributeName() != null) {
-                String jsonPointer = convertToJsonPointer(mapping.getIssueAttributeName());
+            } else if (mapping.getIssueAttributeName() != null) {
+                String jsonPointer = StringUtils.convertToJsonPointer(mapping.getIssueAttributeName());
                 JsonNode valueNode = issue.at(jsonPointer);
                 if (!valueNode.isMissingNode() && !valueNode.isNull()) {
-                    // Check if the field should be processed as a String array.
                     if (mapping.getDataType() != null && mapping.getDataType().startsWith("String[]")) {
-                        List<String> processedValues = processStringArrayValue(valueNode);
+                        List<String> processedValues = JsonNodeUtils.processStringArrayValue(valueNode);
                         flat.put(flatKey, processedValues);
                     } else {
                         String processedValue = processValue(valueNode, mapping.getDataType());
@@ -222,7 +286,7 @@ public class JiraIssueService {
     }
 
     /**
-     * Process a value based on its dataType.
+     * Processes a value based on its dataType.
      * - For "String" or "String[IssueKey]", simply return the text.
      * - For "DateAsString[pattern]", verify/format the date.
      */
@@ -230,14 +294,12 @@ public class JiraIssueService {
         if (dataType == null || (dataType.startsWith("String") && !dataType.startsWith("String["))) {
             return valueNode.asText();
         } else if (dataType.startsWith("DateAsString")) {
-            // Expected format: DateAsString[yyyy-mm-dd] (or similar)
             String pattern = dataType.substring(dataType.indexOf('[') + 1, dataType.indexOf(']'));
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
             try {
                 LocalDate date = LocalDate.parse(valueNode.asText(), formatter);
                 return date.format(formatter);
             } catch (Exception e) {
-                // In case of a parsing error, return the original text.
                 return valueNode.asText();
             }
         }
@@ -249,7 +311,6 @@ public class JiraIssueService {
      */
     private List<String> processIssueLinks(JsonNode issue, JiraMappingProperties.IssueLinkMapping linkMapping) {
         List<String> linkedIssueKeys = new ArrayList<>();
-        // Issue links are typically under "fields.issuelinks"
         JsonNode linksArray = issue.at("/fields/issuelinks");
         if (linksArray != null && linksArray.isArray()) {
             for (JsonNode linkNode : linksArray) {
@@ -277,50 +338,5 @@ public class JiraIssueService {
             }
         }
         return linkedIssueKeys;
-    }
-
-    /**
-     * Processes a JsonNode expected to represent an array of strings.
-     */
-    private List<String> processStringArrayValue(JsonNode valueNode) {
-        List<String> result = new ArrayList<>();
-        if (valueNode.isArray()) {
-            for (JsonNode element : valueNode) {
-                result.add(element.asText());
-            }
-        } else {
-            result.add(valueNode.asText());
-        }
-        return result;
-    }
-
-    /**
-     * Converts a dotted path (e.g., "fields.summary") to a JSON pointer (e.g., "/fields/summary").
-     */
-    private String convertToJsonPointer(String dottedPath) {
-        return "/" + dottedPath.replace(".", "/");
-    }
-
-    /**
-     * Converts a human-readable field name (e.g., "Issue Key") into camelCase (e.g., "issueKey").
-     */
-    private String toCamelCase(String input) {
-        StringBuilder sb = new StringBuilder();
-        boolean nextCapital = false;
-        for (char c : input.toCharArray()) {
-            if (Character.isWhitespace(c) || c == '-' || c == '_') {
-                nextCapital = true;
-            } else {
-                if (sb.length() == 0) {
-                    sb.append(Character.toLowerCase(c));
-                } else if (nextCapital) {
-                    sb.append(Character.toUpperCase(c));
-                    nextCapital = false;
-                } else {
-                    sb.append(c);
-                }
-            }
-        }
-        return sb.toString();
     }
 }

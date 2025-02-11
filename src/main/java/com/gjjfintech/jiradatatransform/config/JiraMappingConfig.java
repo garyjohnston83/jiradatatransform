@@ -1,18 +1,22 @@
 package com.gjjfintech.jiradatatransform.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class JiraMappingConfig {
 
-    @Bean(name = "sourceMappingProperties")
-    public JiraMappingProperties sourceMappingProperties() {
-        return JiraMappingPropertiesBinder.bind("classpath:jira-mappings-source.yml");
+    @Bean("sourceMappingProperties")
+    public JiraMappingProperties sourceMappingProperties(
+            @Value("${jira.source.mapping-config}") String mappingConfigPath) {
+        return JiraMappingPropertiesBinder.bind(mappingConfigPath);
     }
 
-    @Bean(name = "destinationMappingProperties")
-    public JiraMappingProperties destinationMappingProperties() {
-        return JiraMappingPropertiesBinder.bind("classpath:jira-mappings-destination.yml");
+    @Bean("destinationMappingProperties")
+    public JiraMappingProperties destinationMappingProperties(
+            @Value("${jira.destination.mapping-config}") String mappingConfigPath) {
+        return JiraMappingPropertiesBinder.bind(mappingConfigPath);
     }
+
 }
