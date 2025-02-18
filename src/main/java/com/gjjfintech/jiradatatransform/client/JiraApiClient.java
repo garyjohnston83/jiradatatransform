@@ -9,7 +9,9 @@ import org.springframework.web.client.RestTemplate;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 
 public class JiraApiClient {
 
@@ -46,17 +48,52 @@ public class JiraApiClient {
      */
     public JsonNode searchIssues(String jql) {
         try {
-            // Optionally encode the JQL if needed.
-            // String encodedJql = URLEncoder.encode(jql, StandardCharsets.UTF_8.toString());
-            String url = baseUrl + "/rest/api/2/search?jql=" + jql;
-            HttpHeaders headers = createHeaders();
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
-            return objectMapper.readTree(response.getBody());
+            int startAt = 0;
+            int maxResults = 50; // You can change this value as needed.
+            int total = 0;
+            List<JsonNode> allIssues = new ArrayList<>();
+
+            do {
+                // Build URL with pagination parameters.
+                String url = baseUrl + "/rest/api/2/search?jql=" + jql
+                        + "&startAt=" + startAt + "&maxResults=" + maxResults;
+                HttpHeaders headers = createHeaders();
+                HttpEntity<String> entity = new HttpEntity<>(headers);
+                ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+                JsonNode result = objectMapper.readTree(response.getBody());
+                // Get issues from current page.
+                JsonNode issues = result.get("issues");
+                if (issues != null && issues.isArray()) {
+                    for (JsonNode issue : issues) {
+                        allIssues.add(issue);
+                    }
+                }
+
+                // Get total results and maxResults from the response.
+                total = result.get("total").asInt();
+                int currentMax = result.get("maxResults").asInt();
+                startAt += currentMax;
+            } while (startAt < total);
+
+            // Build the final result JSON.
+            com.fasterxml.jackson.databind.node.ObjectNode finalResult = objectMapper.createObjectNode();
+            finalResult.put("startAt", 0);
+            finalResult.put("maxResults", allIssues.size());
+            finalResult.put("total", total);
+
+            com.fasterxml.jackson.databind.node.ArrayNode issuesArray = objectMapper.createArrayNode();
+            for (JsonNode issue : allIssues) {
+                issuesArray.add(issue);
+            }
+            finalResult.set("issues", issuesArray);
+
+            return finalResult;
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute searchIssues", e);
         }
     }
+
 
     /**
      * Retrieves a single Jira issue by its key.
@@ -130,6 +167,10 @@ public class JiraApiClient {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
+    }
+
+    public String getBaseUrl() {
+        return baseUrl;
     }
 
     public void setEmail(String email) {
