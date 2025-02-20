@@ -16,6 +16,16 @@ jira:
     bearerToken: ${env.JIRA_DESTINATION_BEARERTOKEN:}
     mapping-config: "classpath:jira-mapping-destination.yml"
 
+servicenow:
+  instanceUrl: ${SERVICENOW_INSTANCE_URL:}
+  username: ${SERVICENOW_USERNAME:}
+  password: ${SERVICENOW_PASSWORD:}
+
+confluence:
+  instanceUrl: ${CONFLUENCE_INSTANCE_URL:}
+  username: ${CONFLUENCE_USERNAME:}
+  apiToken: ${CONFLUENCE_API_TOKEN:}
+
 logging:
   level:
     root: INFO
