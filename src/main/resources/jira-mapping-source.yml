@@ -1,26 +1,37 @@
 jiraFieldMappings:
   "Issue Key":
     issueAttributeName: "key"
+    issueColumnName: "Issue key"
     dataType: "String[IssueKey]"
 
   "Summary":
     issueAttributeName: "fields.summary"
+    issueColumnName: "Summary"
     dataType: "String"
 
   "Due Date":
     issueAttributeName: "fields.duedate"
+    issueColumnName: "Due date"
     dataType: "DateAsString[yyyy-mm-dd]"
 
   "Labels":
     issueAttributeName: "fields.labels"
+    issueColumnName: "Labels"
     dataType: "String[]"
+
+  "External Linking ID":
+    issueAttributeName: "fields.customfield_10000"
+    issueColumnName: "External Linking ID"
+    dataType: "String[IssueKey]"
 
   "Parent Link":
     issueAttributeName: "fields.parent.key"
+    issueColumnName: "Parent Summary"
     dataType: "String[IssueKey]"
     isParentLink: true
 
-  "Dependant Issues":
+  "Blocking Issues":
+    issueColumnName: "Inward issue link (Blocks)"
     issueLink:
       isInward: true
       linkTypes:

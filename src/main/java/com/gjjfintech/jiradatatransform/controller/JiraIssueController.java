@@ -27,10 +27,18 @@ public class JiraIssueController {
      * - If source=false, issues are retrieved from the destination Jira instance.
      */
     @GetMapping
-    public Collection<Map<String, Object>> getIssues(@RequestParam(name="jql", required=true) String jql,
+    public Collection<Map<String, Object>> getIssuesByJql(@RequestParam(name="jql", required=true) String jql,
                                                      @RequestParam(name="source", required=false) Boolean isSource) {
         boolean useSourceJiraInstance = isSource != null && isSource;
         return jiraIssueService.getIssuesByJql(jql, useSourceJiraInstance);
+    }
+
+    @GetMapping("/file")
+    public Collection<Map<String, Object>> getIssuesByFile(@RequestParam(name="isSource", required=false) Boolean isSource,
+                                                     @RequestParam(name="useLatest", required=true) Boolean useLatest,
+                                                     @RequestParam(name="filename", required=false) String filename) {
+        boolean useSourceJiraInstance = isSource != null && isSource;
+        return jiraIssueService.getIssuesByFile(useSourceJiraInstance, useLatest.booleanValue(), filename);
     }
 
     /**

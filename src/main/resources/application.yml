@@ -4,6 +4,7 @@ server:
 jira:
   source:
     base-url: ${env.JIRA_SOURCE_BASE_URL:}
+    data-folder: ${env.JIRA_SOURCE_DATA_FOLDER:}
     email: ${env.JIRA_SOURCE_EMAIL:}
     authToken: ${env.JIRA_SOURCE_AUTHTOKEN:}
     bearerToken: ${env.JIRA_SOURCE_BEARERTOKEN:}
@@ -11,6 +12,7 @@ jira:
 
   destination:
     base-url: ${env.JIRA_DESTINATION_BASE_URL:}
+    data-folder: ${env.JIRA_DESTINATION_DATA_FOLDER:}
     email: ${env.JIRA_DESTINATION_EMAIL:}
     authToken: ${env.JIRA_DESTINATION_AUTHTOKEN:}
     bearerToken: ${env.JIRA_DESTINATION_BEARERTOKEN:}

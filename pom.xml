@@ -22,18 +22,6 @@
         <java.version>17</java.version>
     </properties>
 
-    <!-- Force all SnakeYAML dependencies to use version 1.29
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.yaml</groupId>
-                <artifactId>snakeyaml</artifactId>
-                <version>1.29</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-    -->
-
     <dependencies>
         <!-- Spring Boot Web Starter -->
         <dependency>
@@ -46,6 +34,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.10.0</version>
         </dependency>
 
         <!-- Jackson Dataformat YAML without its transitive SnakeYAML dependency -->
@@ -61,13 +55,6 @@
             </exclusions>
         </dependency>
 
-        <!-- Explicit SnakeYAML dependency: version 1.29 forced by dependencyManagement
-
-        <dependency>
-            <groupId>org.yaml</groupId>
-            <artifactId>snakeyaml</artifactId>
-        </dependency>
-         -->
     </dependencies>
 
     <build>

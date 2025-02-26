@@ -25,6 +25,7 @@ public class JiraMappingProperties {
      */
     public static class FieldMapping {
         private String issueAttributeName;
+        private String issueColumnName;
         private String dataType;
         private Boolean isParentLink;
         // NEW: Flag indicating that this field is used for linking between instances.
@@ -37,6 +38,14 @@ public class JiraMappingProperties {
 
         public void setIssueAttributeName(String issueAttributeName) {
             this.issueAttributeName = issueAttributeName;
+        }
+
+        public String getIssueColumnName() {
+            return issueColumnName;
+        }
+
+        public void setIssueColumnName(String issueColumnName) {
+            this.issueColumnName = issueColumnName;
         }
 
         public String getDataType() {

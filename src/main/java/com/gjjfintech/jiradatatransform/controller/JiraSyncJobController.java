@@ -21,7 +21,7 @@ public class JiraSyncJobController {
 
     /**
      * POST /sync
-     * Accepts a JSON payload with a "jql" field.
+     * Accepts a JSON payload with a "jql" field or file details.
      * Example payload: { "jql": "project=MYPROJECT AND issuetype=Epic" }
      *
      * This endpoint will:
@@ -34,9 +34,18 @@ public class JiraSyncJobController {
     @PostMapping
     public ResponseEntity<String> syncIssues(@RequestBody SyncRequest syncRequest) {
         String jql = syncRequest.getJql();
-        Collection<Map<String, Object>> sourceIssues = jiraIssueService.getIssuesByJql(jql, true);
-        jiraIssueService.synchronizeIssuesToDestination(sourceIssues);
-        return ResponseEntity.ok("Sync completed successfully.");
+        if(jql != null && !jql.isEmpty()) {
+            Collection<Map<String, Object>> sourceIssues = jiraIssueService.getIssuesByJql(jql, true);
+            jiraIssueService.synchronizeIssuesToDestination(sourceIssues);
+            return ResponseEntity.ok("Sync completed successfully.");
+        } else if(syncRequest.getUseLatestFile() != null) {
+            Collection<Map<String, Object>> sourceIssues = jiraIssueService.getIssuesByFile(true,
+                    syncRequest.getUseLatestFile().booleanValue(), syncRequest.getFilename());
+            jiraIssueService.synchronizeIssuesToDestination(sourceIssues);
+            return ResponseEntity.ok("Sync completed successfully.");
+        }
+
+        return ResponseEntity.badRequest().body("Either provide JQL or file details");
     }
 
     /**
@@ -44,6 +53,8 @@ public class JiraSyncJobController {
      */
     public static class SyncRequest {
         private String jql;
+        private Boolean useLatestFile;
+        private String filename;
 
         public String getJql() {
             return jql;
@@ -51,6 +62,22 @@ public class JiraSyncJobController {
 
         public void setJql(String jql) {
             this.jql = jql;
+        }
+
+        public Boolean getUseLatestFile() {
+            return useLatestFile;
+        }
+
+        public void setUseLatestFile(Boolean useLatestFile) {
+            this.useLatestFile = useLatestFile;
+        }
+
+        public String getFilename() {
+            return filename;
+        }
+
+        public void setFilename(String filename) {
+            this.filename = filename;
         }
     }
 }
